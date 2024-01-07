@@ -391,7 +391,18 @@ void Socket<tcp>::ListenIncomingHandler(tcp::socket* newAsioSocket, const boost:
 		if (tcpAcceptor) {
 			Socket<tcp>* newSocket = socketHandler.CreateSocket<tcp>(sm_sockettype);
 			newSocket->socket = newAsioSocket;
-			callbackHandler.AddCallback(new Callback(CallbackEvent_Incoming, this, newSocket, newAsioSocket->remote_endpoint()));
+			
+			boost::system::error_code ec;
+			auto endpoint = newAsioSocket->remote_endpoint(ec);
+			if(ec)
+			{
+				callbackHandler.AddCallback(new Callback(CallbackEvent_Error, this, SM_ErrorType_LISTEN_ERROR, ec.value()));
+				delete newAsioSocket;
+				delete handlerLock;
+				return;
+			}
+
+			callbackHandler.AddCallback(new Callback(CallbackEvent_Incoming, this, newSocket, endpoint));
 
 			newSocket->ReceiveHandler(new char[16384], 16384, 0, boost::system::errc::make_error_code(boost::system::errc::success), new boost::shared_lock<boost::shared_mutex>(newSocket->handlerMutex));
 
